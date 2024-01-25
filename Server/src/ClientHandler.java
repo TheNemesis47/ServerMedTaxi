@@ -57,6 +57,7 @@ public class ClientHandler implements Runnable {
                 String data = input.readLine(); // La data deve essere in formato yyyy-mm-dd
                 String orario = input.readLine();
                 String telefono = input.readLine();
+                String codice = input.readLine(); // Il codice deve essere di 6 cifre
 
                 // Conversione della data in oggetto Date
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -82,19 +83,20 @@ public class ClientHandler implements Runnable {
                     output.println(azienda);
                 }
                 output.println("END_OF_LIST"); // Segnale di fine dell'elenco
-                // Elabora la richiesta (aggiungi la logica necessaria)
+
+                String aziendaSelezionata = input.readLine(); // Leggi la risposta dal client per vedere qual azienda ha selezioato
+                System.out.println("Azienda selezionata: " + aziendaSelezionata);
+
+
                 String result = "Risposta elaborata con successo";
 
                 // Invia la risposta al client
                 output.println(result);
-            } 
-            // Altri casi di richiesta...
+            }
 
             // Chiudi la connessione
             clientSocket.close();
 
-            // Chiudi la connessione
-            clientSocket.close();
         } catch (IOException | ParseException e) {
             e.printStackTrace();
         }
