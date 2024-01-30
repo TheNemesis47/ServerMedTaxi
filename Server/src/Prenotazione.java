@@ -16,9 +16,13 @@ import java.util.List;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import Singleton.Database;
 import org.json.JSONObject;
+
+import static java.sql.DriverManager.getConnection;
 
 public class Prenotazione {
     private String nome;
@@ -29,8 +33,7 @@ public class Prenotazione {
     private Date giorno;
     private String orario;
     private Double cellulare;
-    private String piva;
-    private String targa;
+    private String targa = "0000aa";
 
     public Prenotazione(String nome, String cognome, String email, String partenza, String arrivo, Date giorno1, String orario, Double cellulare) {
         this.nome = nome;
@@ -46,12 +49,13 @@ public class Prenotazione {
     public List<String> ricercaAziendeDisponibili() {
         List<String> aziendeDisponibili = new ArrayList<>();
         try (Connection connection = Database.getInstance().getConnection()) {
-            String query = "SELECT nome, piva, prezzo_per_km FROM azienda WHERE EXISTS "
-                         + "(SELECT * FROM disponibilita WHERE azienda.piva = disponibilita.piva_azienda "
-                         + "AND fascia_oraria = ? AND numero_ambulanze > 0)";
-            try (PreparedStatement statement = connection.prepareStatement(query)) {
-                statement.setString(1, orario);
+            String campoDisponibilita = orario.equals("mattina") ? "disp_mattina" : "disp_sera";
 
+            String query = "SELECT nome, piva, prezzo_per_km FROM azienda WHERE EXISTS "
+                    + "(SELECT * FROM disponibilita WHERE azienda.piva = disponibilita.piva "
+                    + "AND " + campoDisponibilita + " > 0)";
+
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
                 try (ResultSet resultSet = statement.executeQuery()) {
                     while (resultSet.next()) {
                         String nomeAzienda = resultSet.getString("nome");
@@ -65,13 +69,9 @@ public class Prenotazione {
             e.printStackTrace();
         }
 
-
         return aziendeDisponibili;
     }
 
-
-
-    
 
 
     public List<String> calcolaDistanzaECosto(List<String> aziendeDisponibili) {
@@ -143,5 +143,39 @@ public class Prenotazione {
     }
 
 
-    // Qui puoi aggiungere altri metodi, come getter e setter per le variabili di istanza, o altri metodi utili
+
+    public static String estrattorePIVA(String testo){
+        // Espressione regolare per una sequenza di 11 cifre
+        String regex = "\\b\\d{11}\\b";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(testo);
+
+        // Trova la prima corrispondenza
+        if (matcher.find()) {
+            return matcher.group();
+        }
+
+        // Restituisce null se nessuna corrispondenza è trovata
+        return null;
+    }
+    public void immissionePrenotazione(String piva, String codice, String targa, String ora_precisa) throws SQLException {
+        System.out.println(nome + ' ' + cognome + ' ' + partenza + ' ' + arrivo + ' ' + this.giorno + ' ' + cellulare + ' ' + orario + ' ' + piva + ' ' + codice + ' ' + targa);
+        try (Connection connection = Database.getInstance().getConnection()) {
+            String sql = "INSERT INTO prenotazione (nome_trasportato, cognome_trasportato, indirizzo_partenza, indirizzo_arrivo, giorno_trasporto, numero_cellulare, mattina_sera, code_track, p_iva, targa) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, this.nome);
+                statement.setString(2, this.cognome);
+                statement.setString(3, this.partenza);
+                statement.setString(4, this.arrivo);
+                java.sql.Date sqlDate = new java.sql.Date(this.giorno.getTime());
+                statement.setDate(5, sqlDate);
+                statement.setDouble(6, this.cellulare);
+                statement.setString(7, ora_precisa);
+                statement.setString(8, codice);
+                statement.setString(9, piva);
+                statement.setString(10, targa);
+                statement.executeUpdate();
+            }
+        }
+    }
 }

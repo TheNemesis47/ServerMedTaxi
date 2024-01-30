@@ -20,7 +20,7 @@ public class ClientHandler implements Runnable {
         try {
             BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             PrintWriter output = new PrintWriter(clientSocket.getOutputStream(), true);
-            
+
 
             // Leggi e gestisci le richieste del client
             String richiesta = input.readLine();
@@ -55,6 +55,7 @@ public class ClientHandler implements Runnable {
                 String partenza = input.readLine();
                 String arrivo = input.readLine();
                 String data = input.readLine(); // La data deve essere in formato yyyy-mm-dd
+                String ora_precisa = input.readLine(); // La ora deve essere in formato HH:mm:ss
                 String orario = input.readLine();
                 String telefono = input.readLine();
                 String codice = input.readLine(); // Il codice deve essere di 6 cifre
@@ -69,6 +70,7 @@ public class ClientHandler implements Runnable {
                 System.out.println(partenza);
                 System.out.println(arrivo);
                 System.out.println(giorno);
+                System.out.println(ora_precisa);
                 System.out.println(orario);
                 System.out.println(telefono);
 
@@ -85,6 +87,7 @@ public class ClientHandler implements Runnable {
                 output.println("END_OF_LIST"); // Segnale di fine dell'elenco
 
                 String aziendaSelezionata = input.readLine(); // Leggi la risposta dal client per vedere qual azienda ha selezioato
+                String pivaAzScelta =  prenotazione.estrattorePIVA(aziendaSelezionata);
                 System.out.println("Azienda selezionata: " + aziendaSelezionata);
 
 
@@ -92,6 +95,12 @@ public class ClientHandler implements Runnable {
 
                 // Invia la risposta al client
                 output.println(result);
+
+
+                //avviso pop-up di prenotazione all azienda con quella piva
+
+                AziendaHandler aziendaHandler = new AziendaHandler(prenotazione, pivaAzScelta);
+                aziendaHandler.sendBookingDetails(nome, cognome, email, partenza, arrivo, sdf.format(giorno), ora_precisa, telefono, codice);
             }
 
             // Chiudi la connessione
