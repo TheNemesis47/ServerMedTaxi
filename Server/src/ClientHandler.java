@@ -1,15 +1,19 @@
+import org.json.JSONArray;
+import org.json.JSONObject;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
 import java.net.Socket;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.sql.Date;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ClientHandler implements Runnable {
     private Socket clientSocket;
+    private BufferedReader input;
+    private BufferedWriter output;
+    private String fileJSON = "Prenotazione.json"; // Assicurati che il percorso esista
 
     public ClientHandler(Socket clientSocket) {
         this.clientSocket = clientSocket;
@@ -18,96 +22,181 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         try {
-            BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            PrintWriter output = new PrintWriter(clientSocket.getOutputStream(), true);
+            input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+            output = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
 
 
-            // Leggi e gestisci le richieste del client
-            String richiesta = input.readLine();
-            String whois = "azienda";
+            System.out.println("Connessione accettata.");
+            // Ricevi il JSON dal cliente
+            StringBuilder jsonInput = new StringBuilder();
+            String line;
+            while ((line = input.readLine()) != null) {
+                if (line.equals("END")) {
+                    break;
+                }
+                jsonInput.append(line);
+            }
+            System.out.println("JSON ricevuto: " + jsonInput);
+            JSONObject jsonReceived = new JSONObject(jsonInput.toString());
 
-            if (richiesta.equals(whois)) {
-                output.println("Benvenuto azienda");
+            // Scrivi il JSON ricevuto in un file
+            JSONHandler.scriviJsonInFile(jsonReceived.toString(), this.fileJSON);
 
-                // Leggi i tre parametri 
-                String param1 = input.readLine();
-                String param2 = input.readLine();
-                String param3 = input.readLine();
+            // Aggiungi aziende disponibili al JSON
+            List<String> aziendeDisponibili = getAziendeDisponibili(); // Implementa questa logica
+            jsonReceived.put("aziendeDisponibili", new JSONArray(aziendeDisponibili));
 
-                // Stampa i parametri ricevuti dal client
-                System.out.println("Parametri ricevuti dal client:");
-                System.out.println("Parametro 1: " + param1);
-                System.out.println("Parametro 2: " + param2);
-                System.out.println("Parametro 3: " + param3);
+            // Invia il JSON modificato al cliente
+            output.write(jsonReceived.toString());
+            output.newLine();
+            output.flush();
 
-                // Elabora la richiesta (aggiungi la logica necessaria)
-                String result = "Risposta elaborata con successo";
+            // Aspetta la risposta del cliente con l'azienda scelta
+            jsonInput = new StringBuilder();
+            while ((line = input.readLine()) != null && !line.isEmpty()) {
+                jsonInput.append(line);
+            }
+            JSONObject jsonUpdated = new JSONObject(jsonInput.toString());
 
-                // Invia la risposta al client
-                output.println(result);
-            } else {
-                output.println("Benvenuto client");
+            // Aggiorna il file JSON con la scelta dell'azienda
+            JSONHandler.scriviJsonInFile(jsonUpdated.toString(), this.fileJSON);
 
-                // Leggere i parametri per la prenotazione
-                String nome = input.readLine();
-                String cognome = input.readLine();
-                String email = input.readLine();
-                String partenza = input.readLine();
-                String arrivo = input.readLine();
-                String data = input.readLine(); // La data deve essere in formato yyyy-mm-dd
-                String ora_precisa = input.readLine(); // La ora deve essere in formato HH:mm:ss
-                String orario = input.readLine();
-                String telefono = input.readLine();
-                String codice = input.readLine(); // Il codice deve essere di 6 cifre
+            // Qui potresti passare il JSON a AziendaHandler o eseguire altre operazioni
 
-                // Conversione della data in oggetto Date
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                Date giorno = new Date(sdf.parse(data).getTime());
+            output.close();
+            input.close();
+            clientSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-                System.out.println(nome);
-                System.out.println(cognome);
-                System.out.println(email);
-                System.out.println(partenza);
-                System.out.println(arrivo);
-                System.out.println(giorno);
-                System.out.println(ora_precisa);
-                System.out.println(orario);
-                System.out.println(telefono);
+    private List<String> getAziendeDisponibili() {
+        // Simula la logica per ottenere una lista di aziende disponibili
+        List<String> aziende = new ArrayList<>();
+        aziende.add("Azienda1");
+        aziende.add("Azienda2");
+        // Aggiungi altre aziende secondo logica
+        return aziende;
+    }
+}
 
-                // Creazione oggetto Prenotazione
-                Prenotazione prenotazione = new Prenotazione(nome, cognome, email, partenza, arrivo, giorno, orario, Double.parseDouble(telefono));
+
+
+
+
+
+/*
+import java.io.BufferedReader;
+
+import java.io.BufferedWriter;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.IOException;
+import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+
+public class ClientHandler implements Runnable {
+    private static int fileCount = 0;
+    private Socket clientSocket;
+    private BufferedReader input;
+    private BufferedWriter output;
+    private String fileJSON;
+
+    public ClientHandler(Socket clientSocket) {
+        this.clientSocket = clientSocket;
+        synchronized (ClientHandler.class) {
+            fileCount++;
+            this.fileJSON = "Prenotazione.json";
+        }
+    }
+
+
+
+    @Override
+    public void run() {
+        try {
+
+            input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+            output = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
+
+            StringBuilder jsonInput = new StringBuilder();
+            String line;
+            System.out.println("ciao" + fileCount);
+            while ((line = input.readLine()) != null && !line.isEmpty()) {
+                jsonInput.append(line);
+            }
+
+
+
+            JSONHandler jsonHandler = new JSONHandler(jsonInput.toString());
+            System.out.println("ciao");
+            jsonHandler.scriviJsonInFile(this.fileJSON);
+
+            // Gestisci la richiesta in base al tipo di utente
+            String isUser = "cliente";
+            if (jsonHandler.getTipoUtente().equals(isUser)){
+                //é un cliente
+
+                // Utilizza JSONHandler per estrarre i dati necessari
+                String nome = jsonHandler.getNome();
+                String cognome = jsonHandler.getCognome();
+                String email = jsonHandler.getEmail();
+                String partenza = jsonHandler.getPartenza();
+                String arrivo = jsonHandler.getArrivo();
+                String giorno = jsonHandler.getGiorno();
+                String ora_precisa = jsonHandler.getOra_precisa();
+                String orario = jsonHandler.getOrario();
+                String cellulare = jsonHandler.getCellulare();
+
+                //DA ELIMINAREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE SOLO PER DEBUG
+                System.out.println(nome + ' ' + cognome + ' ' + email + ' ' + partenza + ' ' + arrivo + ' ' + giorno + ' ' + ora_precisa + ' ' + orario + ' ' + cellulare + ' ');
+
+                Prenotazione prenotazione = new Prenotazione(nome, cognome, email, partenza, arrivo, giorno, orario, cellulare);
+                jsonHandler.setCodice(prenotazione.generateRandomString(5));
+
+                // Genera una lista di aziende disponibili per la prenotazione
                 List<String> aziende = prenotazione.ricercaAziendeDisponibili();
+
+                // Calcola la distanza tra due punti
                 prenotazione.calcolaDistanzaECosto(aziende);
 
-                System.out.println("Azienda disponibili: " + aziende);
+                JSONHandler.aggiuntaAziende(aziende);
 
-                for (String azienda : aziende) {
-                    output.println(azienda);
-                }
-                output.println("END_OF_LIST"); // Segnale di fine dell'elenco
+                // Invia il JSON al client
+                String jsonContent = new String(Files.readAllBytes(Paths.get(fileJSON)));
+                output.write(jsonContent);
+                output.flush();
+
+
+
+
+
+
+
 
                 String aziendaSelezionata = input.readLine(); // Leggi la risposta dal client per vedere qual azienda ha selezioato
                 String pivaAzScelta =  prenotazione.estrattorePIVA(aziendaSelezionata);
                 System.out.println("Azienda selezionata: " + aziendaSelezionata);
 
-
-                String result = "Risposta elaborata con successo";
-
                 // Invia la risposta al client
-                output.println(result);
+                String result = "Risposta elaborata con successo";
+                output.write(result);
 
 
                 //avviso pop-up di prenotazione all azienda con quella piva
 
                 AziendaHandler aziendaHandler = new AziendaHandler(prenotazione, pivaAzScelta);
-                aziendaHandler.sendBookingDetails(nome, cognome, email, partenza, arrivo, sdf.format(giorno), ora_precisa, telefono, codice);
+                aziendaHandler.sendBookingDetails(nome, cognome, email, partenza, arrivo, giorno, ora_precisa, cellulare, jsonHandler.getCodice());
             }
 
-            // Chiudi la connessione
-            clientSocket.close();
-
-        } catch (IOException | ParseException e) {
+            output.flush(); // Assicurati che tutti i dati siano inviati al client
+            clientSocket.close(); // Chiudi la connessione dopo aver gestito la richiesta
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 }
+ */

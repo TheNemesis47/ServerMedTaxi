@@ -6,11 +6,14 @@
  *      crea la query per aggiungere nella tabella prenotazione
  *      se la query va a buon fine, mostra messaggio di conferma
  */
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Date;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.net.HttpURLConnection;
@@ -32,19 +35,36 @@ public class Prenotazione {
     private String arrivo;
     private Date giorno;
     private String orario;
-    private Double cellulare;
-    private String targa = "0000aa";
+    private String cellulare;
 
-    public Prenotazione(String nome, String cognome, String email, String partenza, String arrivo, Date giorno1, String orario, Double cellulare) {
+    public Prenotazione(String nome, String cognome, String email, String partenza, String arrivo, String giorno1, String orario, String cellulare) {
         this.nome = nome;
         this.cognome = cognome;
         this.email = email;
         this.partenza = partenza;
         this.arrivo = arrivo;
-        this.giorno = giorno1;
+        this.giorno = convertStringToSqlDate(giorno1);
         this.orario = orario;
         this.cellulare = cellulare;
     }
+
+
+
+    public static Date convertStringToSqlDate(String dateString) {
+        //stabilisco come deve essere la data
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+        try {
+            // parsing della stringa in java.util.Date
+            java.util.Date parsed = format.parse(dateString);
+            // parsing da java.util.Date in java.sql.Date
+            return new Date(parsed.getTime());
+        } catch (ParseException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+
 
     public List<String> ricercaAziendeDisponibili() {
         List<String> aziendeDisponibili = new ArrayList<>();
@@ -74,6 +94,21 @@ public class Prenotazione {
 
 
 
+    public String generateRandomString(int length) {
+        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!?";
+        StringBuilder randomString = new StringBuilder(length);
+        SecureRandom random = new SecureRandom();
+
+        for (int i = 0; i < length; i++) {
+            int randomIndex = random.nextInt(characters.length());
+            randomString.append(characters.charAt(randomIndex));
+        }
+
+        return randomString.toString();
+    }
+
+
+
     public List<String> calcolaDistanzaECosto(List<String> aziendeDisponibili) {
         List<String> risultatoRicerca = new ArrayList<>();
         double distanza = calcolaDistanza(partenza, arrivo);
@@ -88,9 +123,6 @@ public class Prenotazione {
 
         return risultatoRicerca;
     }
-
-
-
 
 
 
@@ -158,6 +190,9 @@ public class Prenotazione {
         // Restituisce null se nessuna corrispondenza è trovata
         return null;
     }
+
+
+
     public void immissionePrenotazione(String piva, String codice, String targa, String ora_precisa) throws SQLException {
         System.out.println(nome + ' ' + cognome + ' ' + partenza + ' ' + arrivo + ' ' + this.giorno + ' ' + cellulare + ' ' + orario + ' ' + piva + ' ' + codice + ' ' + targa);
         try (Connection connection = Database.getInstance().getConnection()) {
@@ -169,7 +204,7 @@ public class Prenotazione {
                 statement.setString(4, this.arrivo);
                 java.sql.Date sqlDate = new java.sql.Date(this.giorno.getTime());
                 statement.setDate(5, sqlDate);
-                statement.setDouble(6, this.cellulare);
+                statement.setString(6, this.cellulare);
                 statement.setString(7, ora_precisa);
                 statement.setString(8, codice);
                 statement.setString(9, piva);
