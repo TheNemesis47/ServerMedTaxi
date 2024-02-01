@@ -36,24 +36,30 @@ public class Prenotazione {
     private Date giorno;
     private String orario;
     private String cellulare;
+    private String codice;
+    private String aziendaScelta;
 
-    public Prenotazione(String nome, String cognome, String email, String partenza, String arrivo, String giorno1, String orario, String cellulare) {
-        this.nome = nome;
-        this.cognome = cognome;
-        this.email = email;
-        this.partenza = partenza;
-        this.arrivo = arrivo;
-        this.giorno = convertStringToSqlDate(giorno1);
-        this.orario = orario;
-        this.cellulare = cellulare;
+    public Prenotazione(String JSON) {
+        JSONHandler jsonHandler = new JSONHandler(JSON);
+        this.nome = jsonHandler.getNome();
+        this.cognome = jsonHandler.getCognome();
+        this.email = jsonHandler.getEmail();
+        this.partenza = jsonHandler.getPartenza();
+        this.arrivo = jsonHandler.getArrivo();
+        this.giorno = convertStringToSqlDate(jsonHandler.getGiorno());
+        this.orario = jsonHandler.getOrario();
+        this.cellulare = jsonHandler.getCellulare();
+        this.codice = jsonHandler.getCodice();
     }
 
 
 
     public static Date convertStringToSqlDate(String dateString) {
+        System.out.println("prima della a");
         //stabilisco come deve essere la data
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
         try {
+            System.out.println("prima della v");
             // parsing della stringa in java.util.Date
             java.util.Date parsed = format.parse(dateString);
             // parsing da java.util.Date in java.sql.Date
@@ -71,7 +77,7 @@ public class Prenotazione {
         try (Connection connection = Database.getInstance().getConnection()) {
             String campoDisponibilita = orario.equals("mattina") ? "disp_mattina" : "disp_sera";
 
-            String query = "SELECT nome, piva, prezzo_per_km FROM azienda WHERE EXISTS "
+            String query = "SELECT nome, piva FROM azienda WHERE EXISTS "
                     + "(SELECT * FROM disponibilita WHERE azienda.piva = disponibilita.piva "
                     + "AND " + campoDisponibilita + " > 0)";
 
@@ -80,8 +86,7 @@ public class Prenotazione {
                     while (resultSet.next()) {
                         String nomeAzienda = resultSet.getString("nome");
                         String pivaAzienda = resultSet.getString("piva");
-                        float prezzoPerKm = resultSet.getFloat("prezzo_per_km");
-                        aziendeDisponibili.add(nomeAzienda + " (" + pivaAzienda + ") - Prezzo per km: " + prezzoPerKm);
+                        aziendeDisponibili.add(nomeAzienda + " - " + pivaAzienda);
                     }
                 }
             }
@@ -94,35 +99,42 @@ public class Prenotazione {
 
 
 
-    public String generateRandomString(int length) {
-        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!?";
-        StringBuilder randomString = new StringBuilder(length);
-        SecureRandom random = new SecureRandom();
-
-        for (int i = 0; i < length; i++) {
-            int randomIndex = random.nextInt(characters.length());
-            randomString.append(characters.charAt(randomIndex));
-        }
-
-        return randomString.toString();
-    }
-
-
-
-    public List<String> calcolaDistanzaECosto(List<String> aziendeDisponibili) {
+    public List<String> calcolaDistanzaECosto() {
         List<String> risultatoRicerca = new ArrayList<>();
-        double distanza = calcolaDistanza(partenza, arrivo);
+        double distanzaPartenzaArrivo = calcolaDistanza(partenza, arrivo); // Distanza di partenza all'arrivo
 
-        for (String azienda : aziendeDisponibili) {
-            String[] parti = azienda.split(" - Prezzo per km: ");
-            String nomeAzienda = parti[0];
-            double prezzoPerKm = Double.parseDouble(parti[1]);
-            double costo = distanza * prezzoPerKm;
-            risultatoRicerca.add(nomeAzienda + " - Distanza: " + distanza + " km - Costo: " + costo + " €");
+        try (Connection connection = Database.getInstance().getConnection()) {
+            String campoDisponibilita = orario.equals("mattina") ? "disp_mattina" : "disp_sera";
+            String query = "SELECT nome, piva, prezzo_per_km, indirizzo FROM azienda WHERE EXISTS " +
+                    "(SELECT * FROM disponibilita WHERE azienda.piva = disponibilita.piva " +
+                    "AND " + campoDisponibilita + " > 0)";
+
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    while (resultSet.next()) {
+                        String nomeAzienda = resultSet.getString("nome");
+                        String pivaAzienda = resultSet.getString("piva");
+                        double prezzoPerKm = resultSet.getDouble("prezzo_per_km");
+                        String indirizzoAzienda = resultSet.getString("indirizzo");
+
+                        double distanzaAziendaPartenza = calcolaDistanza(indirizzoAzienda, partenza);
+                        double costoAziendaPartenza = distanzaAziendaPartenza * prezzoPerKm;
+                        double costoTotaleTragitto = (distanzaAziendaPartenza + distanzaPartenzaArrivo) * prezzoPerKm;
+
+                        String risultato = String.format("Azienda: %s - P.IVA: %s - Costo per Km: %.2f€ - Dist azienda-partenza: %.2f km - Dist partenza-arrivo: %.2f km - Costo totale tragitto: %.2f€",
+                                nomeAzienda, pivaAzienda, prezzoPerKm, distanzaAziendaPartenza, distanzaPartenzaArrivo, costoTotaleTragitto);
+                        risultatoRicerca.add(risultato);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
 
         return risultatoRicerca;
     }
+
+
 
 
 
@@ -176,7 +188,7 @@ public class Prenotazione {
 
 
 
-    public static String estrattorePIVA(String testo){
+    public String estrattorePIVA(String testo){
         // Espressione regolare per una sequenza di 11 cifre
         String regex = "\\b\\d{11}\\b";
         Pattern pattern = Pattern.compile(regex);
@@ -184,11 +196,17 @@ public class Prenotazione {
 
         // Trova la prima corrispondenza
         if (matcher.find()) {
+            this.aziendaScelta = matcher.group();
             return matcher.group();
         }
 
         // Restituisce null se nessuna corrispondenza è trovata
         return null;
+    }
+
+
+    public void setPiva(String piva) {
+        this.aziendaScelta = piva;
     }
 
 
@@ -206,8 +224,8 @@ public class Prenotazione {
                 statement.setDate(5, sqlDate);
                 statement.setString(6, this.cellulare);
                 statement.setString(7, ora_precisa);
-                statement.setString(8, codice);
-                statement.setString(9, piva);
+                statement.setString(8, this.codice);
+                statement.setString(9, this.aziendaScelta);
                 statement.setString(10, targa);
                 statement.executeUpdate();
             }

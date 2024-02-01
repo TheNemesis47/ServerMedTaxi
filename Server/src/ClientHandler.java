@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +27,6 @@ public class ClientHandler implements Runnable {
             output = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
 
 
-            System.out.println("Connessione accettata.");
             // Ricevi il JSON dal cliente
             StringBuilder jsonInput = new StringBuilder();
             String line;
@@ -36,15 +36,18 @@ public class ClientHandler implements Runnable {
                 }
                 jsonInput.append(line);
             }
-            System.out.println("JSON ricevuto: " + jsonInput);
             JSONObject jsonReceived = new JSONObject(jsonInput.toString());
 
             // Scrivi il JSON ricevuto in un file
-            JSONHandler.scriviJsonInFile(jsonReceived.toString(), this.fileJSON);
+            //JSONHandler.scriviJsonInFile(jsonReceived.toString(), this.fileJSON);
 
             // Aggiungi aziende disponibili al JSON
-            List<String> aziendeDisponibili = getAziendeDisponibili(); // Implementa questa logica
-            jsonReceived.put("aziendeDisponibili", new JSONArray(aziendeDisponibili));
+            jsonReceived.put("codice", generateRandomString(5));
+            Prenotazione prenotazione = new Prenotazione(jsonReceived.toString());
+            List<String> aziendeDisponibili = prenotazione.ricercaAziendeDisponibili();
+            List<String> aziendeInfo = prenotazione.calcolaDistanzaECosto();
+            jsonReceived.put("aziendeDisponibili", new JSONArray(aziendeInfo));
+
 
             // Invia il JSON modificato al cliente
             output.write(jsonReceived.toString());
@@ -54,14 +57,25 @@ public class ClientHandler implements Runnable {
             // Aspetta la risposta del cliente con l'azienda scelta
             jsonInput = new StringBuilder();
             while ((line = input.readLine()) != null && !line.isEmpty()) {
+                if (line.equals("END")) {
+                    break;
+                }
                 jsonInput.append(line);
             }
             JSONObject jsonUpdated = new JSONObject(jsonInput.toString());
 
-            // Aggiorna il file JSON con la scelta dell'azienda
+            //Invio prenotazione all azienda
+            //estrapolo la piva dall azienda scelta
+            String pivaAzScelta =  prenotazione.estrattorePIVA(jsonUpdated.getString("aziendaScelta"));
+            jsonUpdated.put("pivaAZScelta", pivaAzScelta);
+            prenotazione.setPiva(pivaAzScelta);
+
+            // aggiorno file json
             JSONHandler.scriviJsonInFile(jsonUpdated.toString(), this.fileJSON);
 
-            // Qui potresti passare il JSON a AziendaHandler o eseguire altre operazioni
+            AziendaHandler aziendaHandler = new AziendaHandler(prenotazione);
+            aziendaHandler.sendBookingDetails(jsonUpdated.toString(), pivaAzScelta);
+
 
             output.close();
             input.close();
@@ -71,15 +85,22 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private List<String> getAziendeDisponibili() {
-        // Simula la logica per ottenere una lista di aziende disponibili
-        List<String> aziende = new ArrayList<>();
-        aziende.add("Azienda1");
-        aziende.add("Azienda2");
-        // Aggiungi altre aziende secondo logica
-        return aziende;
+
+    public String generateRandomString(int length) {
+        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!?";
+        StringBuilder randomString = new StringBuilder(length);
+        SecureRandom random = new SecureRandom();
+
+        for (int i = 0; i < length; i++) {
+            int randomIndex = random.nextInt(characters.length());
+            randomString.append(characters.charAt(randomIndex));
+        }
+
+        return randomString.toString();
     }
 }
+
+
 
 
 

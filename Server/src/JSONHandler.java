@@ -40,7 +40,7 @@ public class JSONHandler {
     }
 
     public String getGiorno() {
-        return jsonObject.getString("giorno");
+        return jsonObject.getString("data");
     }
 
     public String getOra_precisa() {
@@ -48,7 +48,7 @@ public class JSONHandler {
     }
 
     public String getOrario() {
-        return jsonObject.getString("orario");
+        return jsonObject.getString("fasciaOraria");
     }
 
 
@@ -62,6 +62,9 @@ public class JSONHandler {
 
     public String getCodice() {
         return jsonObject.getString("codice");
+    }
+    public String getPIva() {
+        return jsonObject.getString("pivaAZScelta");
     }
 
     public static String aggiuntaAziende(List<String> aziende) {
