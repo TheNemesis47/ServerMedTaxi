@@ -1,0 +1,16 @@
+### Build / output ###
+out/
+build/
+*.class
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+*.iws
+*.ipr
+
+### Logs ###
+*.log
+
+### Mac OS ###
+.DS_Store
